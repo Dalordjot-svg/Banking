@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POS Управление</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white relative">
+
+    <div class="max-w-md mx-auto bg-white min-h-screen shadow-2xl flex flex-col relative border-x border-slate-100">
+        
+        <!-- Шапка -->
+        <header class="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 p-5 z-40 flex justify-between items-center">
+            <div>
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Панель управления</p>
+                <h1 class="text-xl font-bold text-slate-900 tracking-tight">POS Администратор</h1>
+            </div>
+            <div class="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+            </div>
+        </header>
+
+        <!-- Контент -->
+        <div class="flex-1 pb-24 overflow-y-auto">
+            
+            <!-- ГЛАВНАЯ -->
+            <main id="view-dashboard" class="tab-content active p-5 space-y-6">
+                <div class="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-xl shadow-indigo-100 relative overflow-hidden">
+                    <p class="text-indigo-200 text-sm font-medium mb-1">Выручка за сегодня</p>
+                    <h2 id="dash-today-revenue" class="text-3xl font-bold tracking-tight">0 ₽</h2>
+                    <div class="mt-4 pt-4 border-t border-indigo-500/30 flex justify-between text-xs text-indigo-100">
+                        <span>Чеков: <strong id="dash-today-receipts">0</strong></span>
+                        <span id="dash-time">Обновлено только что</span>
+                    </div>
+                </div>
+
+                <section class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Сейчас на смене</h3>
+                        <span id="online-count" class="bg-emerald-50 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-semibold border border-emerald-100 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>0 онлайн
+                        </span>
+                    </div>
+                    <div id="online-employees-list" class="space-y-2">
+                        <p class="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-xl border border-dashed">На смене пока никого нет</p>
+                    </div>
+                </section>
+            </main>
+
+            <!-- АНАЛИТИКА -->
+            <main id="view-analytics" class="tab-content p-5 space-y-6">
+                <h2 class="text-lg font-bold text-slate-900 tracking-tight">Показатели</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+                        <p class="text-xs font-medium text-slate-400 mb-0.5">Средний чек</p>
+                        <p id="analytics-avg-check" class="text-lg font-bold text-slate-900">0 ₽</p>
+                    </div>
+                    <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+                        <p class="text-xs font-medium text-slate-400 mb-0.5">Общая выручка</p>
+                        <p id="analytics-total-revenue" class="text-lg font-bold text-slate-900">0 ₽</p>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Лента операций</h3>
+                    <div class="bg-white border border-slate-100 rounded-2xl p-2 divide-y divide-slate-50" id="analytics-sales-list"></div>
+                </div>
+            </main>
+
+            <!-- ТОВАРЫ -->
+            <main id="view-products" class="tab-content p-5 space-y-6">
+                <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-3">
+                    <h3 class="text-sm font-bold text-slate-800">Настройки кассы</h3>
+                    <div class="flex items-end gap-3">
+                        <div class="flex-1">
+                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Макс. скидка (%)</label>
+                            <input type="number" id="max-discount-input" min="0" max="100" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm">
+                        </div>
+                        <button id="save-discount-btn" class="bg-slate-900 text-white font-semibold text-sm py-2 px-4 rounded-xl hover:bg-slate-800">Сохранить</button>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
+                    <h3 class="text-sm font-bold text-slate-800">Новый товар</h3>
+                    <form id="add-product-form" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Название</label>
+                            <input type="text" id="prod-name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Цена (₽)</label>
+                            <input type="number" id="prod-price" required min="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm">
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-semibold text-sm py-3 rounded-xl hover:bg-indigo-700">Добавить</button>
+                    </form>
+                </div>
+
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Каталог</h3>
+                    <div class="bg-white border border-slate-100 rounded-2xl p-2 divide-y divide-slate-50" id="product-list"></div>
+                </div>
+            </main>
+
+            <!-- ОБНОВЛЕННАЯ ВКЛАДКА: РЕКЛАМА ПО ССЫЛКАМ (БЕЗ STORAGE) -->
+            <main id="view-ads" class="tab-content p-5 space-y-6">
+                
+                <div class="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl p-5 text-white shadow-lg">
+                    <h2 class="font-bold text-lg mb-1">Управление рекламой</h2>
+                    <p class="text-xs text-indigo-50 opacity-90 mb-4">Вставьте ссылку на любое горизонтальное изображение из интернета. Оно сразу появится на iPad покупателя.</p>
+                    
+                    <form id="add-ad-url-form" class="space-y-3">
+                        <input type="url" id="ad-url-input" required class="w-full bg-white/20 border border-white/30 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/60 focus:outline-none focus:bg-white/30 transition" placeholder="https://site.com/image.jpg">
+                        <button type="submit" class="w-full bg-white text-indigo-600 font-bold text-sm py-2.5 rounded-xl hover:bg-slate-100 transition shadow">
+                            Добавить баннер на экран
+                        </button>
+                    </form>
+                </div>
+
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Текущие баннеры</h3>
+                    <div class="grid grid-cols-2 gap-3" id="ads-gallery">
+                        <div class="col-span-2 text-center text-sm text-slate-400 py-6">Загрузка галереи...</div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- СОТРУДНИКИ -->
+            <main id="view-employees" class="tab-content p-5 space-y-6">
+                <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
+                    <h3 class="text-sm font-bold text-slate-800">Регистрация кассира</h3>
+                    <form id="add-employee-form" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Имя</label>
+                            <input type="text" id="emp-name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">PIN-код (4 цифры)</label>
+                            <input type="number" id="emp-pin" required min="1000" max="9999" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm">
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-semibold text-sm py-3 rounded-xl hover:bg-indigo-700">Создать аккаунт</button>
+                    </form>
+                </div>
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Сотрудники</h3>
+                    <div class="bg-white border border-slate-100 rounded-2xl p-2 divide-y divide-slate-50" id="employee-list"></div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Навигация -->
+        <nav class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-100 grid grid-cols-5 p-2 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <button data-tab="dashboard" class="nav-btn flex flex-col items-center gap-1 py-1 text-indigo-600 font-medium transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg><span class="text-[10px]">Главная</span></button>
+            <button data-tab="analytics" class="nav-btn flex flex-col items-center gap-1 py-1 text-slate-400 font-medium transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg><span class="text-[10px]">Отчеты</span></button>
+            <button data-tab="products" class="nav-btn flex flex-col items-center gap-1 py-1 text-slate-400 font-medium transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg><span class="text-[10px]">Товары</span></button>
+            <button data-tab="ads" class="nav-btn flex flex-col items-center gap-1 py-1 text-slate-400 font-medium transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg><span class="text-[10px]">Реклама</span></button>
+            <button data-tab="employees" class="nav-btn flex flex-col items-center gap-1 py-1 text-slate-400 font-medium transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg><span class="text-[10px]">Кадры</span></button>
+        </nav>
+    </div>
+
+    <!-- МУЛЬТИ-МОДАЛКИ -->
+    <div id="employee-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative transform scale-95 transition-transform duration-300" id="emp-modal-content">
+            <button onclick="closeModal('employee-modal', 'emp-modal-content')" class="absolute top-4 right-4 text-slate-400 hover:bg-slate-100 p-1.5 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            <h3 class="text-lg font-bold text-slate-900 mb-4">Профиль сотрудника</h3>
+            <form id="edit-employee-form" class="space-y-4">
+                <div><label class="block text-xs font-semibold text-slate-400">ИМЯ</label><input type="text" id="edit-emp-name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2"></div>
+                <div><label class="block text-xs font-semibold text-slate-400">PIN-КОД</label><input type="number" id="edit-emp-pin" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2"></div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 bg-indigo-600 text-white text-sm py-2 rounded-xl">Сохранить</button>
+                    <button type="button" id="delete-emp-btn" class="bg-rose-100 text-rose-600 px-4 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                </div>
+            </form>
+            <hr class="my-5 border-slate-100">
+            <div class="text-center">
+                <p class="text-xs font-semibold text-slate-400 uppercase mb-3">Вход для кассира</p>
+                <div class="flex justify-center mb-3"><div id="qrcode-container" class="p-2 bg-white border-2 border-indigo-100 rounded-xl"></div></div>
+                <input type="text" id="cabinet-link" readonly class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-500 mb-2">
+                <button type="button" id="copy-link-btn" class="text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">Скопировать ссылку</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="product-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative transform scale-95 transition-transform duration-300" id="prod-modal-content">
+            <button onclick="closeModal('product-modal', 'prod-modal-content')" class="absolute top-4 right-4 text-slate-400 hover:bg-slate-100 p-1.5 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            <h3 class="text-lg font-bold text-slate-900 mb-4">Редактировать товар</h3>
+            <form id="edit-product-form" class="space-y-4">
+                <div><label class="block text-xs font-semibold text-slate-400">НАЗВАНИЕ</label><input type="text" id="edit-prod-name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2"></div>
+                <div><label class="block text-xs font-semibold text-slate-400">ЦЕНА (₽)</label><input type="number" id="edit-prod-price" required min="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2"></div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 bg-indigo-600 text-white text-sm py-2.5 rounded-xl">Сохранить</button>
+                    <button type="button" id="delete-prod-btn" class="bg-rose-100 text-rose-600 px-4 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Логика и Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue, set, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDqQQlsIdHgizrPfZC2If9uHegyiiCqfSc",
+            authDomain: "bd2026-b52de.firebaseapp.com",
+            databaseURL: "https://bd2026-b52de-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "bd2026-b52de",
+            storageBucket: "bd2026-b52de.firebasestorage.app"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // -- НАВИГАЦИЯ --
+        const navButtons = document.querySelectorAll('.nav-btn');
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                navButtons.forEach(b => b.classList.replace('text-indigo-600', 'text-slate-400'));
+                btn.classList.replace('text-slate-400', 'text-indigo-600');
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.toggle('active', content.id === `view-${btn.dataset.tab}`);
+                });
+            });
+        });
+
+        // УНИВЕРСАЛЬНЫЕ МОДАЛКИ
+        window.closeModal = (modalId, contentId) => {
+            const m = document.getElementById(modalId);
+            const c = document.getElementById(contentId);
+            m.classList.add('opacity-0'); c.classList.add('scale-95');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        };
+        const openModal = (modalId, contentId) => {
+            const m = document.getElementById(modalId);
+            const c = document.getElementById(contentId);
+            m.classList.remove('hidden');
+            setTimeout(() => { m.classList.remove('opacity-0'); c.classList.remove('scale-95'); }, 10);
+        };
+
+        // ==========================================
+        // БЕЗОПАСНАЯ ЛОГИКА РЕКЛАМЫ (ТОЛЬКО ДАННЫЕ)
+        // ==========================================
+        document.getElementById('add-ad-url-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('ad-url-input');
+            const url = input.value;
+
+            push(ref(db, 'ads'), {
+                url: url,
+                uploadedAt: new Date().toISOString()
+            }).then(() => {
+                alert('Ссылка на баннер успешно сохранена в базу!');
+                input.value = '';
+            }).catch(err => alert('Ошибка сохранения: ' + err.message));
+        });
+
+        // Загрузка галереи ссылок
+        onValue(ref(db, 'ads'), (snapshot) => {
+            const gallery = document.getElementById('ads-gallery');
+            gallery.innerHTML = '';
+            
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    const ad = child.val();
+                    const adId = child.key;
+                    
+                    const div = document.createElement('div');
+                    div.className = "relative rounded-xl overflow-hidden aspect-[4/3] bg-slate-100 shadow-sm border border-slate-200 group";
+                    div.innerHTML = `
+                        <img src="${ad.url}" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1594322436404-5a0526db4d13?q=80&w=500&auto=format&fit=crop'" alt="Ad">
+                        <button class="absolute top-2 right-2 bg-white/90 text-rose-500 p-1.5 rounded-lg shadow backdrop-blur-sm opacity-0 group-hover:opacity-100 transition" onclick="window.deleteAd('${adId}')">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    `;
+                    gallery.appendChild(div);
+                });
+            } else {
+                gallery.innerHTML = `<div class="col-span-2 text-center text-sm text-slate-400 py-6">Рекламных баннеров пока нет</div>`;
+            }
+        });
+
+        window.deleteAd = (dbId) => {
+            if (confirm('Удалить эту ссылку на рекламу?')) {
+                remove(ref(db, `ads/${dbId}`));
+            }
+        };
+
+        // ==========================================
+        // БЛОК ТОВАРОВ И НАСТРОЕК
+        // ==========================================
+        let productsData = {};
+        let currentEditProductId = null;
+
+        onValue(ref(db, 'settings/maxDiscount'), (snapshot) => {
+            document.getElementById('max-discount-input').value = snapshot.val() || 0;
+        });
+        document.getElementById('save-discount-btn').addEventListener('click', () => {
+            set(ref(db, 'settings/maxDiscount'), parseInt(document.getElementById('max-discount-input').value) || 0)
+                .then(() => alert('Настройки скидки сохранены!'));
+        });
+
+        document.getElementById('add-product-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            set(push(ref(db, 'products')), { 
+                name: document.getElementById('prod-name').value, 
+                price: parseFloat(document.getElementById('prod-price').value) 
+            }).then(() => { alert('Товар добавлен!'); e.target.reset(); });
+        });
+
+        onValue(ref(db, 'products'), (snapshot) => {
+            const list = document.getElementById('product-list');
+            list.innerHTML = ''; productsData = {};
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    const prod = child.val(); productsData[child.key] = prod;
+                    list.innerHTML += `<div class="p-3 flex justify-between items-center transition hover:bg-slate-50"><div><p class="text-sm font-semibold text-slate-800">${prod.name}</p><p class="text-xs text-indigo-600 font-medium">${prod.price} ₽</p></div><button onclick="window.openProductModal('${child.key}')" class="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-200">Изменить</button></div>`;
+                });
+            }
+        });
+
+        window.openProductModal = (id) => {
+            currentEditProductId = id;
+            document.getElementById('edit-prod-name').value = productsData[id].name;
+            document.getElementById('edit-prod-price').value = productsData[id].price;
+            openModal('product-modal', 'prod-modal-content');
+        };
+
+        document.getElementById('edit-product-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            update(ref(db, `products/${currentEditProductId}`), {
+                name: document.getElementById('edit-prod-name').value, price: parseFloat(document.getElementById('edit-prod-price').value)
+            }).then(() => closeModal('product-modal', 'prod-modal-content'));
+        });
+
+        document.getElementById('delete-prod-btn').addEventListener('click', () => {
+            if (confirm('Удалить товар?')) remove(ref(db, `products/${currentEditProductId}`)).then(() => closeModal('product-modal', 'prod-modal-content'));
+        });
+
+        // ==========================================
+        // БЛОК СОТРУДНИКОВ
+        // ==========================================
+        let employeesData = {};
+        let currentEditEmployeeId = null;
+
+        document.getElementById('add-employee-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            set(push(ref(db, 'employees')), {
+                name: document.getElementById('emp-name').value, pin: document.getElementById('emp-pin').value,
+                role: 'cashier', isOnline: false, lastActive: new Date().toISOString()
+            }).then(() => { alert('Сотрудник добавлен!'); e.target.reset(); });
+        });
+
+        onValue(ref(db, 'employees'), (snapshot) => {
+            const list = document.getElementById('employee-list');
+            const onlineList = document.getElementById('online-employees-list');
+            let onlineCount = 0;
+            list.innerHTML = ''; onlineList.innerHTML = ''; employeesData = {};
+            
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    const emp = child.val(); employeesData[child.key] = emp;
+                    const status = emp.isOnline ? `<span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 rounded-md">В сети</span>` : '';
+                    
+                    list.innerHTML += `<div class="p-3 flex justify-between items-center transition hover:bg-slate-50"><div><p class="text-sm font-semibold">${emp.name}</p><div class="flex gap-2 mt-1">${status}<span class="text-xs text-slate-400">PIN: ${emp.pin}</span></div></div><button onclick="window.openEmployeeModal('${child.key}')" class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg">Подробно</button></div>`;
+                    if (emp.isOnline) {
+                        onlineCount++;
+                        onlineList.innerHTML += `<div class="bg-white border rounded-xl p-3 flex gap-3"><div class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center">${emp.name[0].toUpperCase()}</div><div><p class="text-sm font-semibold">${emp.name}</p><p class="text-xs text-emerald-600">На кассе</p></div></div>`;
+                    }
+                });
+                document.getElementById('online-count').innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 ${onlineCount>0?'animate-pulse':''}"></span> ${onlineCount} онлайн`;
+            }
+        });
+
+        window.openEmployeeModal = (id) => {
+            currentEditEmployeeId = id;
+            const emp = employeesData[id];
+            document.getElementById('edit-emp-name').value = emp.name;
+            document.getElementById('edit-emp-pin').value = emp.pin;
+            
+            const link = `${window.location.origin}${window.location.pathname.replace('admin.html', '')}cashier.html?auth=${id}`;
+            document.getElementById('cabinet-link').value = link;
+            
+            const qrContainer = document.getElementById('qrcode-container');
+            qrContainer.innerHTML = '';
+            new QRCode(qrContainer, { text: link, width: 128, height: 128, colorDark: "#312e81", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
+            
+            openModal('employee-modal', 'emp-modal-content');
+        };
+
+        document.getElementById('edit-employee-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            update(ref(db, `employees/${currentEditEmployeeId}`), { name: document.getElementById('edit-emp-name').value, pin: document.getElementById('edit-emp-pin').value })
+                .then(() => closeModal('employee-modal', 'emp-modal-content'));
+        });
+
+        document.getElementById('delete-emp-btn').addEventListener('click', () => {
+            if (confirm('Удалить сотрудника?')) remove(ref(db, `employees/${currentEditEmployeeId}`)).then(() => closeModal('employee-modal', 'emp-modal-content'));
+        });
+        document.getElementById('copy-link-btn').addEventListener('click', () => { document.getElementById('cabinet-link').select(); document.execCommand('copy'); alert('Скопировано!'); });
+
+        // ==========================================
+        // БЛОК АНАЛИТИКИ
+        // ==========================================
+        onValue(ref(db, 'sales'), (snapshot) => {
+            let tRev = 0, tRec = 0, todayRev = 0, todayRec = 0;
+            const today = new Date().toDateString();
+            const list = document.getElementById('analytics-sales-list');
+            list.innerHTML = '';
+            
+            if (snapshot.exists()) {
+                const sales = [];
+                snapshot.forEach(child => {
+                    const s = child.val();
+                    if(new Date(s.timestamp).toDateString() === today) { todayRev += s.amount; todayRec++; }
+                    tRev += s.amount||0; tRec++;
+                    sales.push(s);
+                });
+                
+                document.getElementById('dash-today-revenue').innerText = `${todayRev.toLocaleString('ru')} ₽`;
+                document.getElementById('dash-today-receipts').innerText = todayRec;
+                document.getElementById('analytics-total-revenue').innerText = `${tRev.toLocaleString('ru')} ₽`;
+                document.getElementById('analytics-avg-check').innerText = `${Math.round(tRev/tRec).toLocaleString('ru')} ₽`;
+                    
+                sales.slice(-5).reverse().forEach(s => {
+                    const t = new Date(s.timestamp).toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'});
+                    list.innerHTML += `<div class="p-3 flex justify-between"><div class="flex gap-3"><div class="w-8 h-8 bg-slate-50 flex items-center justify-center rounded-lg">🛒</div><div><p class="text-sm font-semibold">Продажа • ${t}</p><p class="text-xs text-slate-400">${s.cashierName||'Система'}</p></div></div><span class="text-sm font-bold">+${s.amount} ₽</span></div>`;
+                });
+            }
+        });
+    </script>
+</body>
+</html>

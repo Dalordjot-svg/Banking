@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POS Касса</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow: hidden; touch-action: pan-y; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+        
+        .swipe-container { position: relative; width: 100%; height: 56px; background: #0f172a; border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; user-select: none; }
+        .swipe-text { color: #94a3b8; font-weight: 700; font-size: 14px; letter-spacing: 1px; pointer-events: none; z-index: 10; transition: opacity 0.3s; }
+        .swipe-track { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #10b981; z-index: 5; }
+        .swipe-thumb { position: absolute; left: 4px; top: 4px; bottom: 4px; width: 48px; background: white; border-radius: 12px; z-index: 20; display: flex; align-items: center; justify-content: center; cursor: grab; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: transform 0.2s ease-out; }
+        .swipe-thumb:active { cursor: grabbing; }
+        .swipe-thumb.no-transition { transition: none; }
+        
+        .no-select { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900 antialiased h-screen flex flex-col relative selection:bg-indigo-500 selection:text-white">
+
+    <!-- ЭКРАН ОШИБКИ -->
+    <div id="auth-error-screen" class="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-24 h-24 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <h1 class="text-2xl font-bold text-slate-900 mb-2">Ой, мы вас не узнали</h1>
+        <p class="text-slate-500 mb-8 max-w-xs">Отсканируйте свой персональный QR-код из панели администратора для входа.</p>
+        <button onclick="window.location.reload()" class="bg-indigo-600 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:bg-indigo-700">Попробовать еще</button>
+    </div>
+
+    <!-- ОСНОВНОЙ ИНТЕРФЕЙС КАССЫ -->
+    <div id="main-app" class="hidden h-full flex flex-col md:flex-row max-w-6xl mx-auto w-full bg-white shadow-2xl relative">
+        
+        <!-- ЛЕВАЯ ЧАСТЬ: Каталог товаров -->
+        <div class="flex-1 flex flex-col bg-slate-50 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-slate-200">
+            <header class="bg-white px-5 py-4 border-b border-slate-200 flex justify-between items-center shadow-sm z-10 relative">
+                <div class="flex items-center gap-3 cursor-pointer p-2 -ml-2 rounded-xl hover:bg-slate-50 transition relative" id="profile-trigger">
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-lg" id="cashier-avatar">К</div>
+                    <div>
+                        <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> На смене</p>
+                        <h2 class="text-sm font-bold text-slate-800" id="cashier-name">Загрузка...</h2>
+                    </div>
+                    
+                    <div id="profile-dropdown" class="absolute top-full left-0 mt-2 w-56 bg-white border border-slate-100 rounded-xl shadow-xl hidden z-50 overflow-hidden opacity-0 transition-opacity">
+                        <button id="show-receipts-btn" class="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-50">📋 Мои чеки за сегодня</button>
+                        <button id="show-report-btn" class="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">📊 Кассовый отчет</button>
+                    </div>
+                </div>
+
+                <button id="encashment-btn" class="flex items-center gap-2 text-rose-600 bg-rose-50 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-rose-100 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                    <span class="hidden sm:inline">Выход</span>
+                </button>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-4">
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" id="products-grid"></div>
+            </div>
+        </div>
+
+        <!-- ПРАВАЯ ЧАСТЬ: Текущий чек -->
+        <div class="w-full md:w-96 flex flex-col bg-white h-1/2 md:h-full z-20">
+            <div class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800">Текущий заказ</h3>
+                <button id="clear-receipt-btn" class="text-xs font-medium text-slate-400 hover:text-rose-500 transition">Очистить</button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-4 space-y-3" id="receipt-items">
+                <div class="text-center text-slate-400 text-sm mt-10">Добавьте товары из catalogа слева</div>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 bg-white space-y-3 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)]">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-semibold text-slate-500">Скидка на чек (%)</span>
+                    <input type="number" id="discount-input" min="0" max="100" value="0" class="w-20 text-right bg-slate-100 border-none rounded-lg px-2 py-1 text-sm font-bold text-slate-700 focus:outline-none">
+                </div>
+                <div class="flex justify-between items-center text-lg font-bold">
+                    <span class="text-slate-900">ИТОГО К ОПЛАТЕ:</span>
+                    <span class="text-indigo-600 text-2xl" id="receipt-total">0 ₽</span>
+                </div>
+                <button id="pay-btn" disabled class="w-full bg-emerald-500 text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-600 disabled:opacity-50 transition active:scale-[0.98]">
+                    ПЕРЕЙТИ К ОПЛАТЕ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ОПЛАТЫ -->
+    <div id="payment-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center sm:p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl relative transform translate-y-full sm:translate-y-0 sm:scale-95 transition-all duration-300" id="payment-content">
+            <button id="close-payment-btn" class="absolute top-4 right-4 text-slate-400 hover:bg-slate-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            
+            <h3 class="text-xl font-bold text-slate-900 mb-2">Принять оплату</h3>
+            <div class="text-3xl font-bold text-indigo-600 mb-6" id="modal-total">0 ₽</div>
+
+            <div class="flex gap-2 mb-6 p-1 bg-slate-100 rounded-xl">
+                <button id="method-cash" class="flex-1 py-2 rounded-lg bg-white shadow text-sm font-bold text-slate-800 transition">Наличными</button>
+                <button id="method-card" class="flex-1 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:text-slate-800 transition">Перевод / QR</button>
+            </div>
+
+            <div id="cash-block" class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Получено от клиента (₽)</label>
+                    <input type="number" id="cash-received" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xl font-bold focus:outline-none focus:border-indigo-500" placeholder="0">
+                </div>
+                <div class="flex justify-between items-center p-4 bg-emerald-50 rounded-xl border border-emerald-100 hidden" id="change-block">
+                    <span class="text-sm font-bold text-emerald-700 uppercase">Сдача:</span>
+                    <span class="text-2xl font-bold text-emerald-600" id="change-amount">0 ₽</span>
+                </div>
+            </div>
+
+            <div id="card-block" class="hidden mb-6 flex flex-col items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p class="text-xs font-semibold text-slate-500 uppercase mb-3 text-center">Покажите QR клиенту</p>
+                <div id="payment-qrcode" class="p-2 bg-white rounded-xl shadow-sm mb-3"></div>
+                <p class="text-sm font-bold text-slate-800">Перевод по номеру:</p>
+                <p class="text-lg font-black text-indigo-600" id="payment-phone">+7 (958) 516-16-79</p>
+            </div>
+
+            <div class="swipe-container" id="swipe-container">
+                <div class="swipe-track" id="swipe-track"></div>
+                <span class="swipe-text" id="swipe-text">ПОТЯНИТЕ ДЛЯ ОПЛАТЫ</span>
+                <div class="swipe-thumb" id="swipe-thumb">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО НАСТРОЙКИ КОНКРЕТНОГО ТОВАРА -->
+    <div id="item-options-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative transform scale-95 transition-transform duration-300" id="item-options-content">
+            <button onclick="closeItemOptions()" class="absolute top-4 right-4 text-slate-400 hover:bg-slate-100 p-1.5 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            
+            <h3 class="text-lg font-bold text-slate-900 mb-1" id="item-opt-title">Настройки товара</h3>
+            <p class="text-xs text-slate-500 mb-5">Базовая цена: <span id="item-opt-base-price">0</span> ₽</p>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-indigo-500 uppercase mb-1">Своя цена (₽)</label>
+                    <input type="number" id="item-opt-price" class="w-full bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <p class="text-[10px] text-slate-400 mt-1">Оставьте пустой, чтобы вернуть базовую цену.</p>
+                </div>
+                
+                <div class="relative flex items-center py-2">
+                    <div class="flex-grow border-t border-slate-200"></div>
+                    <span class="flex-shrink-0 mx-4 text-slate-400 text-xs font-semibold">ИЛИ</span>
+                    <div class="flex-grow border-t border-slate-200"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-emerald-500 uppercase mb-1">Скидка на товар (%)</label>
+                    <input type="number" id="item-opt-discount" min="0" max="100" class="w-full bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-emerald-300" placeholder="Например: 15">
+                </div>
+            </div>
+
+            <button onclick="saveItemOptions()" class="w-full bg-slate-900 text-white font-bold text-sm py-4 rounded-xl shadow-lg mt-6 hover:bg-slate-800 transition">
+                ПРИМЕНИТЬ И СОХРАНИТЬ
+            </button>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ОТЧЕТОВ / ЧЕКОВ -->
+    <div id="reports-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl relative transform scale-95 transition-transform duration-300" id="reports-content">
+            <button onclick="document.getElementById('reports-modal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:bg-slate-100 p-1.5 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            <h3 class="text-lg font-bold text-slate-900 mb-4" id="reports-title">Заголовок</h3>
+            <div id="reports-body" class="max-h-80 overflow-y-auto space-y-2 pr-2"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, get, set, push, update, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDqQQlsIdHgizrPfZC2If9uHegyiiCqfSc",
+            authDomain: "bd2026-b52de.firebaseapp.com",
+            databaseURL: "https://bd2026-b52de-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "bd2026-b52de",
+            storageBucket: "bd2026-b52de.firebasestorage.app"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const authId = urlParams.get('auth');
+        let currentCashier = null;
+
+        // ОБНОВЛЕННЫЕ ДАННЫЕ ОПЛАТЫ ИЗ СКРИНШОТА image_2.png
+        const PAYMENT_LINK = "https://qr.nspk.ru/AS10003P5K6L0K00CP891NQC49A70M9F?type=01&bank=100000000111&crc=C6C6"; 
+        const PAYMENT_PHONE = "+7 (958) 516-16-79"; 
+        let payMethod = 'cash';
+        let receipt = [];
+
+        // СИНХРОНИЗАЦИЯ С ЭКРАНОМ КЛИЕНТА
+        function syncLiveDisplay(statusOverride = null) {
+            let currentTotal = 0;
+            receipt.forEach(item => currentTotal += item.price * item.qty);
+            const globalDisc = parseInt(document.getElementById('discount-input').value) || 0;
+            currentTotal = currentTotal - Math.floor(currentTotal * (globalDisc / 100));
+
+            let status = 'idle';
+            if (receipt.length > 0) status = 'active';
+            if (statusOverride) status = statusOverride;
+
+            const cashInput = parseInt(document.getElementById('cash-received').value) || 0;
+
+            set(ref(db, 'live_display'), {
+                status: status,
+                cart: receipt,
+                total: currentTotal,
+                globalDiscount: globalDisc,
+                paymentMethod: payMethod,
+                cashReceived: cashInput
+            });
+        }
+
+        if (authId) {
+            const empRef = ref(db, `employees/${authId}`);
+            get(empRef).then((snapshot) => {
+                if (snapshot.exists()) {
+                    currentCashier = snapshot.val();
+                    currentCashier.id = authId;
+                    update(empRef, { isOnline: true });
+                    onDisconnect(empRef).update({ isOnline: false });
+
+                    document.getElementById('auth-error-screen').classList.add('hidden');
+                    document.getElementById('main-app').classList.remove('hidden');
+                    document.getElementById('cashier-name').innerText = currentCashier.name;
+                    document.getElementById('cashier-avatar').innerText = currentCashier.name.charAt(0).toUpperCase();
+                    
+                    // Генерация QR-кода на основе реальной платежной ссылки
+                    new QRCode(document.getElementById('payment-qrcode'), {
+                        text: PAYMENT_LINK, width: 128, height: 128, colorDark: "#0f172a", colorLight: "#f8fafc", correctLevel: QRCode.CorrectLevel.L
+                    });
+                    document.getElementById('payment-phone').innerText = PAYMENT_PHONE;
+
+                    initTerminal();
+                }
+            });
+        }
+
+        // ПРОФИЛЬ И ОТЧЕТЫ
+        const profileTrigger = document.getElementById('profile-trigger');
+        const profileDropdown = document.getElementById('profile-dropdown');
+        profileTrigger.addEventListener('click', (e) => {
+            if (e.target.closest('#profile-dropdown')) return;
+            profileDropdown.classList.toggle('hidden');
+            setTimeout(() => profileDropdown.classList.toggle('opacity-0'), 10);
+        });
+        document.addEventListener('click', (e) => {
+            if (!profileTrigger.contains(e.target)) {
+                profileDropdown.classList.add('opacity-0');
+                setTimeout(() => profileDropdown.classList.add('hidden'), 200);
+            }
+        });
+
+        function fetchTodayData(callback) {
+            get(ref(db, 'sales')).then(snapshot => {
+                const today = new Date().toDateString();
+                let mySales = [];
+                if(snapshot.exists()){
+                    snapshot.forEach(child => {
+                        const s = child.val();
+                        if (s.cashierId === currentCashier.id && new Date(s.timestamp).toDateString() === today) mySales.push(s);
+                    });
+                }
+                callback(mySales);
+            });
+        }
+
+        document.getElementById('show-receipts-btn').addEventListener('click', () => {
+            fetchTodayData((sales) => {
+                const body = document.getElementById('reports-body');
+                document.getElementById('reports-title').innerText = "Мои продажи (Сегодня)";
+                body.innerHTML = '';
+                if(sales.length === 0) body.innerHTML = '<p class="text-sm text-slate-500">Продаж пока не было.</p>';
+                sales.reverse().forEach(s => {
+                    const time = new Date(s.timestamp).toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'});
+                    body.innerHTML += `<div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center"><div class="text-sm"><span class="font-bold text-slate-800">${s.amount} ₽</span> <span class="text-slate-400 text-xs ml-2">${time}</span><p class="text-xs text-slate-500 mt-1">${s.method === 'cash' ? '💵 Наличные' : '💳 Перевод'}</p></div></div>`;
+                });
+                document.getElementById('reports-modal').classList.remove('hidden');
+                setTimeout(() => document.getElementById('reports-modal').classList.remove('opacity-0'), 10);
+            });
+        });
+
+        document.getElementById('show-report-btn').addEventListener('click', () => {
+            fetchTodayData((sales) => {
+                let total = 0, cash = 0, card = 0;
+                sales.forEach(s => { total += s.amount; if(s.method === 'cash') cash += s.amount; else card += s.amount; });
+                document.getElementById('reports-title').innerText = "Кассовый отчет Z";
+                document.getElementById('reports-body').innerHTML = `
+                    <div class="bg-indigo-50 p-4 rounded-xl mb-3"><p class="text-sm text-indigo-500 font-semibold mb-1">ОБЩАЯ ВЫРУЧКА</p><p class="text-3xl font-black text-indigo-700">${total} ₽</p></div>
+                    <div class="grid grid-cols-2 gap-2"><div class="bg-slate-50 p-3 rounded-xl border"><p class="text-xs text-slate-400 mb-1">Наличные</p><p class="font-bold">${cash} ₽</p></div><div class="bg-slate-50 p-3 rounded-xl border"><p class="text-xs text-slate-400 mb-1">Переводы</p><p class="font-bold">${card} ₽</p></div></div>
+                    <p class="text-xs text-slate-400 text-center mt-4">Чеков пробито: ${sales.length}</p>
+                `;
+                document.getElementById('reports-modal').classList.remove('hidden');
+                setTimeout(() => document.getElementById('reports-modal').classList.remove('opacity-0'), 10);
+            });
+        });
+
+        // ТЕРМИНАЛ И ЧЕК
+        function initTerminal() {
+            onValue(ref(db, 'products'), (snapshot) => {
+                const grid = document.getElementById('products-grid');
+                grid.innerHTML = '';
+                if (snapshot.exists()) {
+                    snapshot.forEach(child => {
+                        const prod = child.val();
+                        prod.id = child.key;
+                        const btn = document.createElement('button');
+                        btn.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition active:scale-95";
+                        btn.innerHTML = `<span class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center mb-2 font-bold text-sm">${prod.name.charAt(0)}</span><span class="font-bold text-slate-800 text-sm leading-tight text-left mb-1">${prod.name}</span><span class="text-indigo-600 font-semibold text-xs mt-auto">${prod.price} ₽</span>`;
+                        btn.onclick = () => {
+                            const ex = receipt.find(i => i.id === prod.id && i.isCustomPrice !== true && !i.itemDiscount);
+                            if(ex) {
+                                ex.qty++;
+                            } else {
+                                receipt.push({
+                                    ...prod, 
+                                    cartId: Date.now() + Math.random(), 
+                                    originalPrice: prod.price, 
+                                    itemDiscount: 0, 
+                                    isCustomPrice: false, 
+                                    qty: 1
+                                });
+                            }
+                            renderReceipt();
+                        };
+                        grid.appendChild(btn);
+                    });
+                }
+            });
+        }
+
+        // ЛОГИКА ДОЛГОГО НАЖАТИЯ И НАСТРОЙКИ ТОВАРА
+        let pressTimer;
+        let currentEditCartId = null;
+
+        window.startPress = (e, cartId) => {
+            if(e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+            pressTimer = setTimeout(() => {
+                openItemOptions(cartId);
+            }, 600); 
+        };
+        
+        window.cancelPress = () => { clearTimeout(pressTimer); };
+
+        function openItemOptions(cartId) {
+            currentEditCartId = cartId;
+            const item = receipt.find(i => i.cartId === cartId);
+            
+            document.getElementById('item-opt-title').innerText = item.name;
+            document.getElementById('item-opt-base-price').innerText = item.originalPrice;
+            document.getElementById('item-opt-price').value = item.isCustomPrice ? item.price : '';
+            document.getElementById('item-opt-discount').value = item.itemDiscount || '';
+
+            const modal = document.getElementById('item-options-modal');
+            const content = document.getElementById('item-options-content');
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('scale-95'); }, 10);
+        }
+
+        window.closeItemOptions = () => {
+            const modal = document.getElementById('item-options-modal');
+            const content = document.getElementById('item-options-content');
+            modal.classList.add('opacity-0'); content.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        };
+
+        window.saveItemOptions = () => {
+            const item = receipt.find(i => i.cartId === currentEditCartId);
+            const customPriceInput = document.getElementById('item-opt-price').value;
+            const discountInput = document.getElementById('item-opt-discount').value;
+
+            if (customPriceInput !== '') {
+                item.price = parseFloat(customPriceInput);
+                item.isCustomPrice = true;
+                item.itemDiscount = 0;
+            } else if (discountInput !== '' && parseFloat(discountInput) > 0) {
+                let disc = parseFloat(discountInput);
+                if (disc > 100) disc = 100;
+                item.itemDiscount = disc;
+                item.isCustomPrice = false;
+                item.price = item.originalPrice - (item.originalPrice * (disc / 100));
+            } else {
+                item.price = item.originalPrice;
+                item.isCustomPrice = false;
+                item.itemDiscount = 0;
+            }
+
+            closeItemOptions();
+            renderReceipt();
+        };
+
+        document.getElementById('discount-input').addEventListener('input', () => {
+            renderReceipt();
+        });
+
+        function renderReceipt() {
+            const list = document.getElementById('receipt-items');
+            list.innerHTML = '';
+            let total = 0;
+            
+            if(receipt.length === 0){
+                list.innerHTML = '<div class="text-center text-slate-400 text-sm mt-10">Добавьте товары</div>';
+                document.getElementById('receipt-total').innerText = '0 ₽';
+                document.getElementById('pay-btn').disabled = true;
+                syncLiveDisplay();
+                return;
+            }
+
+            receipt.forEach((item, index) => {
+                total += item.price * item.qty;
+                const div = document.createElement('div');
+                div.className = "flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm no-select cursor-pointer hover:bg-indigo-50 transition";
+                
+                let priceHtml = `<p class="text-xs text-slate-400 font-bold">${item.price} ₽</p>`;
+                if (item.isCustomPrice || item.itemDiscount > 0) {
+                    let badge = item.isCustomPrice ? 'Ручная цена' : `-${item.itemDiscount}%`;
+                    priceHtml = `
+                        <p class="text-xs font-bold text-rose-500">
+                            <span class="line-through text-slate-300 font-normal mr-1">${item.originalPrice}</span>
+                            ${item.price} ₽ 
+                            <span class="bg-rose-100 text-rose-600 text-[9px] px-1.5 py-0.5 rounded ml-1">${badge}</span>
+                        </p>`;
+                }
+
+                div.innerHTML = `
+                    <div class="flex-1" onmousedown="startPress(event, ${item.cartId})" onmouseup="cancelPress()" onmouseleave="cancelPress()" ontouchstart="startPress(event, ${item.cartId})" ontouchend="cancelPress()" ontouchmove="cancelPress()">
+                        <p class="text-sm font-bold">${item.name}</p>
+                        ${priceHtml}
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button class="btn-min w-8 h-8 bg-slate-100 rounded-lg font-bold text-slate-600 hover:bg-slate-200">-</button>
+                        <span class="font-bold text-sm w-4 text-center">${item.qty}</span>
+                        <button class="btn-plus w-8 h-8 bg-slate-100 rounded-lg font-bold text-slate-600 hover:bg-slate-200">+</button>
+                    </div>
+                `;
+                
+                div.querySelector('.btn-min').onclick = () => { item.qty--; if(item.qty<=0) receipt.splice(index, 1); renderReceipt(); };
+                div.querySelector('.btn-plus').onclick = () => { item.qty++; renderReceipt(); };
+                list.appendChild(div);
+            });
+
+            const globalDisc = parseInt(document.getElementById('discount-input').value) || 0;
+            const final = total - Math.floor(total * (globalDisc/100));
+            document.getElementById('receipt-total').innerText = `${final} ₽`;
+            document.getElementById('pay-btn').disabled = false;
+            
+            syncLiveDisplay();
+        }
+
+        document.getElementById('clear-receipt-btn').onclick = () => { receipt = []; renderReceipt(); };
+
+        // ОПЛАТА
+        const modal = document.getElementById('payment-modal');
+        const content = document.getElementById('payment-content');
+
+        document.getElementById('pay-btn').onclick = () => {
+            document.getElementById('modal-total').innerText = document.getElementById('receipt-total').innerText;
+            document.getElementById('cash-received').value = '';
+            document.getElementById('change-block').classList.add('hidden');
+            resetSlider();
+            
+            syncLiveDisplay('payment');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('translate-y-full', 'sm:translate-y-0', 'sm:scale-95'); }, 10);
+        };
+        
+        document.getElementById('close-payment-btn').onclick = () => {
+            modal.classList.add('opacity-0'); content.classList.add('translate-y-full', 'sm:translate-y-0', 'sm:scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                syncLiveDisplay();
+            }, 300);
+        };
+
+        const setMethod = (m) => {
+            payMethod = m;
+            document.getElementById('cash-block').classList.toggle('hidden', m !== 'cash');
+            document.getElementById('card-block').classList.toggle('hidden', m !== 'card');
+            document.getElementById('method-cash').className = `flex-1 py-2 rounded-lg text-sm font-bold transition ${m==='cash'?'bg-white shadow text-slate-800':'text-slate-500'}`;
+            document.getElementById('method-card').className = `flex-1 py-2 rounded-lg text-sm font-bold transition ${m==='card'?'bg-white shadow text-slate-800':'text-slate-500'}`;
+            
+            syncLiveDisplay('payment');
+        };
+        document.getElementById('method-cash').onclick = () => setMethod('cash');
+        document.getElementById('method-card').onclick = () => setMethod('card');
+
+        document.getElementById('cash-received').addEventListener('input', (e) => {
+            const req = parseInt(document.getElementById('modal-total').innerText);
+            const rec = parseInt(e.target.value) || 0;
+            if(rec >= req && req > 0) {
+                document.getElementById('change-block').classList.remove('hidden');
+                document.getElementById('change-amount').innerText = `${rec - req} ₽`;
+            } else {
+                document.getElementById('change-block').classList.add('hidden');
+            }
+            syncLiveDisplay('payment');
+        });
+
+        // СВАЙП-ЛОГИКА
+        const container = document.getElementById('swipe-container');
+        const thumb = document.getElementById('swipe-thumb');
+        const track = document.getElementById('swipe-track');
+        const text = document.getElementById('swipe-text');
+        
+        let isDragging = false;
+        let startX = 0;
+        let maxDrag = 0;
+
+        function resetSlider() {
+            thumb.style.transform = `translateX(0px)`;
+            track.style.width = `0px`;
+            text.style.opacity = '1';
+        }
+
+        function finalizePayment() {
+            const finalTotal = parseInt(document.getElementById('modal-total').innerText);
+            const received = parseInt(document.getElementById('cash-received').value) || 0;
+
+            if (payMethod === 'cash' && received < finalTotal) {
+                alert('Сначала введите полученную от клиента сумму!');
+                resetSlider();
+                return;
+            }
+
+            syncLiveDisplay('success');
+
+            set(push(ref(db, 'sales')), {
+                cashierId: currentCashier.id, cashierName: currentCashier.name,
+                amount: finalTotal, method: payMethod,
+                globalDiscountPercent: parseInt(document.getElementById('discount-input').value) || 0,
+                timestamp: new Date().toISOString(),
+                items: receipt.map(i => ({
+                    name: i.name, price: i.price, originalPrice: i.originalPrice, 
+                    qty: i.qty, isCustomPrice: i.isCustomPrice, itemDiscount: i.itemDiscount
+                }))
+            }).then(() => {
+                text.innerText = "ОПЛАЧЕНО ✔";
+                setTimeout(() => {
+                    document.getElementById('close-payment-btn').click();
+                    document.getElementById('clear-receipt-btn').click();
+                    text.innerText = "ПОТЯНИТЕ ДЛЯ ОПЛАТЫ";
+                    syncLiveDisplay();
+                }, 2000);
+            });
+        }
+
+        const handleStart = (e) => {
+            isDragging = true;
+            thumb.classList.add('no-transition');
+            startX = e.type.includes('mouse') ? e.pageX : e.touches[0].pageX;
+            maxDrag = container.clientWidth - thumb.clientWidth - 8;
+        };
+        const handleMove = (e) => {
+            if (!isDragging) return;
+            const currentX = e.type.includes('mouse') ? e.pageX : e.touches[0].pageX;
+            let diff = currentX - startX;
+            if (diff < 0) diff = 0;
+            if (diff > maxDrag) diff = maxDrag;
+
+            thumb.style.transform = `translateX(${diff}px)`;
+            track.style.width = `${diff + thumb.clientWidth}px`;
+            text.style.opacity = 1 - (diff / maxDrag);
+        };
+        const handleEnd = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            thumb.classList.remove('no-transition');
+            
+            const currentMatrix = new DOMMatrix(getComputedStyle(thumb).transform);
+            const currentX = currentMatrix.m41;
+
+            if (currentX > maxDrag * 0.9) { 
+                thumb.style.transform = `translateX(${maxDrag}px)`;
+                track.style.width = `100%`;
+                finalizePayment();
+            } else { 
+                resetSlider();
+            }
+        };
+
+        thumb.addEventListener('mousedown', handleStart);
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+        thumb.addEventListener('touchstart', handleStart);
+        document.addEventListener('touchmove', handleMove);
+        document.addEventListener('touchend', handleEnd);
+
+        document.getElementById('encashment-btn').onclick = () => {
+            if(confirm('Завершить смену?')) {
+                update(ref(db, `employees/${authId}`), { isOnline: false }).then(() => {
+                    window.location.href = window.location.pathname;
+                });
+            }
+        };
+    </script>
+</body>
+</html>
