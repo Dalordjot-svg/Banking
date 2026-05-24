@@ -113,12 +113,11 @@
                 </div>
             </main>
 
-            <!-- ОБНОВЛЕННАЯ ВКЛАДКА: РЕКЛАМА ПО ССЫЛКАМ (БЕЗ STORAGE) -->
+            <!-- ВКЛАДКА: РЕКЛАМА ПО ССЫЛКАМ -->
             <main id="view-ads" class="tab-content p-5 space-y-6">
-                
                 <div class="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl p-5 text-white shadow-lg">
                     <h2 class="font-bold text-lg mb-1">Управление рекламой</h2>
-                    <p class="text-xs text-indigo-50 opacity-90 mb-4">Вставьте ссылку на любое горизонтальное изображение из интернета. Оно сразу появится на iPad покупателя.</p>
+                    <p class="text-xs text-indigo-50 opacity-90 mb-4">Вставьте ссылку на горизонтальное изображение, после чего вы сможете настроить её обрезку/смещение.</p>
                     
                     <form id="add-ad-url-form" class="space-y-3">
                         <input type="url" id="ad-url-input" required class="w-full bg-white/20 border border-white/30 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/60 focus:outline-none focus:bg-white/30 transition" placeholder="https://site.com/image.jpg">
@@ -130,8 +129,9 @@
 
                 <div class="space-y-3">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Текущие баннеры</h3>
-                    <div class="grid grid-cols-2 gap-3" id="ads-gallery">
-                        <div class="col-span-2 text-center text-sm text-slate-400 py-6">Загрузка галереи...</div>
+                    <!-- Списком для удобства настройки положения картинок -->
+                    <div class="space-y-3" id="ads-gallery">
+                        <div class="text-center text-sm text-slate-400 py-6">Загрузка галереи...</div>
                     </div>
                 </div>
             </main>
@@ -141,14 +141,8 @@
                 <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
                     <h3 class="text-sm font-bold text-slate-800">Регистрация кассира</h3>
                     <form id="add-employee-form" class="space-y-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Имя</label>
-                            <input type="text" id="emp-name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">PIN-код (4 цифры)</label>
-                            <input type="number" id="emp-pin" required min="1000" max="9999" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm">
-                        </div>
+                        <div><label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Имя</label><input type="text" id="emp-name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"></div>
+                        <div><label class="block text-xs font-semibold text-slate-400 uppercase mb-1">PIN-код</label><input type="number" id="emp-pin" required min="1000" max="9999" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"></div>
                         <button type="submit" class="w-full bg-indigo-600 text-white font-semibold text-sm py-3 rounded-xl hover:bg-indigo-700">Создать аккаунт</button>
                     </form>
                 </div>
@@ -169,7 +163,36 @@
         </nav>
     </div>
 
-    <!-- МУЛЬТИ-МОДАЛКИ -->
+    <!-- МОДАЛКА РЕДАКТИРОВАНИЯ ПОЗИЦИИ КАРТИНКИ (ПОДГОНКА ПОД IPAD) -->
+    <div id="ad-crop-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative transform scale-95 transition-transform duration-300" id="crop-modal-content">
+            <button onclick="closeModal('ad-crop-modal', 'crop-modal-content')" class="absolute top-4 right-4 text-slate-400 hover:bg-slate-100 p-1.5 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            
+            <h3 class="text-lg font-bold text-slate-900 mb-2">Положение на iPad</h3>
+            <p class="text-xs text-slate-400 mb-4">Двигайте ползунок, чтобы выровнять картинку и текст по высоте.</p>
+            
+            <!-- Интерактивное превью в пропорциях экрана покупателя -->
+            <div class="w-full aspect-[4/3] bg-slate-100 rounded-xl overflow-hidden border border-slate-200 relative mb-4">
+                <div id="crop-preview" class="absolute inset-0 bg-cover bg-center"></div>
+                <div class="absolute inset-x-0 bottom-0 bg-black/40 p-2 text-[10px] text-white text-center">Превью экрана покупателя</div>
+            </div>
+
+            <!-- Ползунок управления смещением по Y -->
+            <div class="space-y-1">
+                <div class="flex justify-between text-xs font-semibold text-slate-400">
+                    <span>Выше (Верх)</span>
+                    <span>Ниже (Низ)</span>
+                </div>
+                <input type="range" id="crop-range" min="0" max="100" value="50" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+            </div>
+
+            <button id="save-crop-btn" class="w-full bg-slate-900 text-white font-bold text-sm py-3.5 rounded-xl shadow-lg mt-6 hover:bg-slate-800 transition">
+                СОХРАНИТЬ ПОЛОЖЕНИЕ
+            </button>
+        </div>
+    </div>
+
+    <!-- ДРУГИЕ МОДАЛКИ -->
     <div id="employee-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
         <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative transform scale-95 transition-transform duration-300" id="emp-modal-content">
             <button onclick="closeModal('employee-modal', 'emp-modal-content')" class="absolute top-4 right-4 text-slate-400 hover:bg-slate-100 p-1.5 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
@@ -184,7 +207,6 @@
             </form>
             <hr class="my-5 border-slate-100">
             <div class="text-center">
-                <p class="text-xs font-semibold text-slate-400 uppercase mb-3">Вход для кассира</p>
                 <div class="flex justify-center mb-3"><div id="qrcode-container" class="p-2 bg-white border-2 border-indigo-100 rounded-xl"></div></div>
                 <input type="text" id="cabinet-link" readonly class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-500 mb-2">
                 <button type="button" id="copy-link-btn" class="text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">Скопировать ссылку</button>
@@ -250,195 +272,115 @@
         };
 
         // ==========================================
-        // БЕЗОПАСНАЯ ЛОГИКА РЕКЛАМЫ (ТОЛЬКО ДАННЫЕ)
+        // УПРАВЛЕНИЕ РЕКЛАМОЙ И ЕЁ СМЕЩЕНИЕМ
         // ==========================================
+        let adsData = {};
+        let currentCropAdId = null;
+
         document.getElementById('add-ad-url-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const input = document.getElementById('ad-url-input');
-            const url = input.value;
-
             push(ref(db, 'ads'), {
-                url: url,
+                url: input.value,
+                posY: 50, // Изначально картинка центрирована (50%)
                 uploadedAt: new Date().toISOString()
             }).then(() => {
-                alert('Ссылка на баннер успешно сохранена в базу!');
+                alert('Баннер успешно добавлен!');
                 input.value = '';
-            }).catch(err => alert('Ошибка сохранения: ' + err.message));
+            });
         });
 
-        // Загрузка галереи ссылок
+        // Отрендерить список баннеров с кнопкой настройки
         onValue(ref(db, 'ads'), (snapshot) => {
             const gallery = document.getElementById('ads-gallery');
             gallery.innerHTML = '';
+            adsData = {};
             
             if (snapshot.exists()) {
                 snapshot.forEach(child => {
                     const ad = child.val();
                     const adId = child.key;
+                    adsData[adId] = ad;
                     
                     const div = document.createElement('div');
-                    div.className = "relative rounded-xl overflow-hidden aspect-[4/3] bg-slate-100 shadow-sm border border-slate-200 group";
+                    div.className = "bg-white border border-slate-100 rounded-xl p-3 flex flex-col gap-3 shadow-sm";
                     div.innerHTML = `
-                        <img src="${ad.url}" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1594322436404-5a0526db4d13?q=80&w=500&auto=format&fit=crop'" alt="Ad">
-                        <button class="absolute top-2 right-2 bg-white/90 text-rose-500 p-1.5 rounded-lg shadow backdrop-blur-sm opacity-0 group-hover:opacity-100 transition" onclick="window.deleteAd('${adId}')">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        <div class="w-full aspect-[16/9] rounded-lg overflow-hidden bg-slate-50 border">
+                            <img src="${ad.url}" class="w-full h-full object-cover" style="object-position: center ${ad.posY || 50}%" alt="Ad">
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="window.openCropModal('${adId}')" class="flex-1 bg-slate-100 text-slate-700 text-xs font-bold py-2 rounded-lg hover:bg-slate-200 transition">
+                                ⚙️ Настроить отображение
+                            </button>
+                            <button onclick="window.deleteAd('${adId}')" class="bg-rose-50 text-rose-600 p-2 rounded-lg hover:bg-rose-100 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        </div>
                     `;
                     gallery.appendChild(div);
                 });
             } else {
-                gallery.innerHTML = `<div class="col-span-2 text-center text-sm text-slate-400 py-6">Рекламных баннеров пока нет</div>`;
+                gallery.innerHTML = `<div class="text-center text-sm text-slate-400 py-6">Рекламных баннеров пока нет</div>`;
             }
+        });
+
+        // Открытие интерактивного ползунка выравнивания
+        window.openCropModal = (adId) => {
+            currentCropAdId = adId;
+            const ad = adsData[adId];
+            
+            const preview = document.getElementById('crop-preview');
+            const range = document.getElementById('crop-range');
+            
+            preview.style.backgroundImage = `url('${ad.url}')`;
+            // Выставляем сохраненную позицию Y (по умолчанию 50)
+            range.value = ad.posY !== undefined ? ad.posY : 50;
+            preview.style.backgroundPosition = `center ${range.value}%`;
+            
+            // Интерактивное обновление при перетаскивании слайдера
+            range.oninput = (e) => {
+                preview.style.backgroundPosition = `center ${e.target.value}%`;
+            };
+
+            openModal('ad-crop-modal', 'crop-modal-content');
+        };
+
+        // Сохранение координат в Firebase
+        document.getElementById('save-crop-btn').addEventListener('click', () => {
+            if (!currentCropAdId) return;
+            const currentY = parseInt(document.getElementById('crop-range').value);
+            
+            update(ref(db, `ads/${currentCropAdId}`), {
+                posY: currentY
+            }).then(() => {
+                closeModal('ad-crop-modal', 'crop-modal-content');
+                alert('Положение баннера сохранено!');
+            });
         });
 
         window.deleteAd = (dbId) => {
-            if (confirm('Удалить эту ссылку на рекламу?')) {
-                remove(ref(db, `ads/${dbId}`));
-            }
+            if (confirm('Удалить баннер?')) remove(ref(db, `ads/${dbId}`));
         };
 
         // ==========================================
-        // БЛОК ТОВАРОВ И НАСТРОЕК
+        // ОСТАЛЬНЫЕ БЛОКИ (БЕЗ ИЗМЕНЕНИЙ)
         // ==========================================
-        let productsData = {};
-        let currentEditProductId = null;
-
-        onValue(ref(db, 'settings/maxDiscount'), (snapshot) => {
-            document.getElementById('max-discount-input').value = snapshot.val() || 0;
-        });
-        document.getElementById('save-discount-btn').addEventListener('click', () => {
-            set(ref(db, 'settings/maxDiscount'), parseInt(document.getElementById('max-discount-input').value) || 0)
-                .then(() => alert('Настройки скидки сохранены!'));
-        });
-
-        document.getElementById('add-product-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            set(push(ref(db, 'products')), { 
-                name: document.getElementById('prod-name').value, 
-                price: parseFloat(document.getElementById('prod-price').value) 
-            }).then(() => { alert('Товар добавлен!'); e.target.reset(); });
-        });
-
-        onValue(ref(db, 'products'), (snapshot) => {
-            const list = document.getElementById('product-list');
-            list.innerHTML = ''; productsData = {};
-            if (snapshot.exists()) {
-                snapshot.forEach(child => {
-                    const prod = child.val(); productsData[child.key] = prod;
-                    list.innerHTML += `<div class="p-3 flex justify-between items-center transition hover:bg-slate-50"><div><p class="text-sm font-semibold text-slate-800">${prod.name}</p><p class="text-xs text-indigo-600 font-medium">${prod.price} ₽</p></div><button onclick="window.openProductModal('${child.key}')" class="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-200">Изменить</button></div>`;
-                });
-            }
-        });
-
-        window.openProductModal = (id) => {
-            currentEditProductId = id;
-            document.getElementById('edit-prod-name').value = productsData[id].name;
-            document.getElementById('edit-prod-price').value = productsData[id].price;
-            openModal('product-modal', 'prod-modal-content');
-        };
-
-        document.getElementById('edit-product-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            update(ref(db, `products/${currentEditProductId}`), {
-                name: document.getElementById('edit-prod-name').value, price: parseFloat(document.getElementById('edit-prod-price').value)
-            }).then(() => closeModal('product-modal', 'prod-modal-content'));
-        });
-
-        document.getElementById('delete-prod-btn').addEventListener('click', () => {
-            if (confirm('Удалить товар?')) remove(ref(db, `products/${currentEditProductId}`)).then(() => closeModal('product-modal', 'prod-modal-content'));
-        });
-
-        // ==========================================
-        // БЛОК СОТРУДНИКОВ
-        // ==========================================
-        let employeesData = {};
-        let currentEditEmployeeId = null;
-
-        document.getElementById('add-employee-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            set(push(ref(db, 'employees')), {
-                name: document.getElementById('emp-name').value, pin: document.getElementById('emp-pin').value,
-                role: 'cashier', isOnline: false, lastActive: new Date().toISOString()
-            }).then(() => { alert('Сотрудник добавлен!'); e.target.reset(); });
-        });
-
-        onValue(ref(db, 'employees'), (snapshot) => {
-            const list = document.getElementById('employee-list');
-            const onlineList = document.getElementById('online-employees-list');
-            let onlineCount = 0;
-            list.innerHTML = ''; onlineList.innerHTML = ''; employeesData = {};
-            
-            if (snapshot.exists()) {
-                snapshot.forEach(child => {
-                    const emp = child.val(); employeesData[child.key] = emp;
-                    const status = emp.isOnline ? `<span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 rounded-md">В сети</span>` : '';
-                    
-                    list.innerHTML += `<div class="p-3 flex justify-between items-center transition hover:bg-slate-50"><div><p class="text-sm font-semibold">${emp.name}</p><div class="flex gap-2 mt-1">${status}<span class="text-xs text-slate-400">PIN: ${emp.pin}</span></div></div><button onclick="window.openEmployeeModal('${child.key}')" class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg">Подробно</button></div>`;
-                    if (emp.isOnline) {
-                        onlineCount++;
-                        onlineList.innerHTML += `<div class="bg-white border rounded-xl p-3 flex gap-3"><div class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center">${emp.name[0].toUpperCase()}</div><div><p class="text-sm font-semibold">${emp.name}</p><p class="text-xs text-emerald-600">На кассе</p></div></div>`;
-                    }
-                });
-                document.getElementById('online-count').innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 ${onlineCount>0?'animate-pulse':''}"></span> ${onlineCount} онлайн`;
-            }
-        });
-
-        window.openEmployeeModal = (id) => {
-            currentEditEmployeeId = id;
-            const emp = employeesData[id];
-            document.getElementById('edit-emp-name').value = emp.name;
-            document.getElementById('edit-emp-pin').value = emp.pin;
-            
-            const link = `${window.location.origin}${window.location.pathname.replace('admin.html', '')}cashier.html?auth=${id}`;
-            document.getElementById('cabinet-link').value = link;
-            
-            const qrContainer = document.getElementById('qrcode-container');
-            qrContainer.innerHTML = '';
-            new QRCode(qrContainer, { text: link, width: 128, height: 128, colorDark: "#312e81", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
-            
-            openModal('employee-modal', 'emp-modal-content');
-        };
-
-        document.getElementById('edit-employee-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            update(ref(db, `employees/${currentEditEmployeeId}`), { name: document.getElementById('edit-emp-name').value, pin: document.getElementById('edit-emp-pin').value })
-                .then(() => closeModal('employee-modal', 'emp-modal-content'));
-        });
-
-        document.getElementById('delete-emp-btn').addEventListener('click', () => {
-            if (confirm('Удалить сотрудника?')) remove(ref(db, `employees/${currentEditEmployeeId}`)).then(() => closeModal('employee-modal', 'emp-modal-content'));
-        });
+        let productsData = {}; let currentEditProductId = null;
+        onValue(ref(db, 'settings/maxDiscount'), (snapshot) => { document.getElementById('max-discount-input').value = snapshot.val() || 0; });
+        document.getElementById('save-discount-btn').addEventListener('click', () => { set(ref(db, 'settings/maxDiscount'), parseInt(document.getElementById('max-discount-input').value) || 0).then(() => alert('Успешно!')); });
+        document.getElementById('add-product-form').addEventListener('submit', (e) => { e.preventDefault(); set(push(ref(db, 'products')), { name: document.getElementById('prod-name').value, price: parseFloat(document.getElementById('prod-price').value) }).then(() => { e.target.reset(); }); });
+        onValue(ref(db, 'products'), (snapshot) => { const list = document.getElementById('product-list'); list.innerHTML = ''; productsData = {}; if (snapshot.exists()) { snapshot.forEach(child => { const prod = child.val(); productsData[child.key] = prod; list.innerHTML += `<div class="p-3 flex justify-between items-center transition hover:bg-slate-50"><div><p class="text-sm font-semibold text-slate-800">${prod.name}</p><p class="text-xs text-indigo-600 font-medium">${prod.price} ₽</p></div><button onclick="window.openProductModal('${child.key}')" class="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-200">Изменить</button></div>`; }); } });
+        window.openProductModal = (id) => { currentEditProductId = id; document.getElementById('edit-prod-name').value = productsData[id].name; document.getElementById('edit-prod-price').value = productsData[id].price; openModal('product-modal', 'prod-modal-content'); };
+        document.getElementById('edit-product-form').addEventListener('submit', (e) => { e.preventDefault(); update(ref(db, `products/${currentEditProductId}`), { name: document.getElementById('edit-prod-name').value, price: parseFloat(document.getElementById('edit-prod-price').value) }).then(() => closeModal('product-modal', 'prod-modal-content')); });
+        document.getElementById('delete-prod-btn').addEventListener('click', () => { if (confirm('Удалить?')) remove(ref(db, `products/${currentEditProductId}`)).then(() => closeModal('product-modal', 'prod-modal-content')); });
+        let employeesData = {}; let currentEditEmployeeId = null;
+        document.getElementById('add-employee-form').addEventListener('submit', (e) => { e.preventDefault(); set(push(ref(db, 'employees')), { name: document.getElementById('emp-name').value, pin: document.getElementById('emp-pin').value, role: 'cashier', isOnline: false, lastActive: new Date().toISOString() }).then(() => { e.target.reset(); }); });
+        onValue(ref(db, 'employees'), (snapshot) => { const list = document.getElementById('employee-list'); const onlineList = document.getElementById('online-employees-list'); let onlineCount = 0; list.innerHTML = ''; onlineList.innerHTML = ''; employeesData = {}; if (snapshot.exists()) { snapshot.forEach(child => { const emp = child.val(); employeesData[child.key] = emp; const status = emp.isOnline ? `<span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 rounded-md">В сети</span>` : ''; list.innerHTML += `<div class="p-3 flex justify-between items-center transition hover:bg-slate-50"><div><p class="text-sm font-semibold">${emp.name}</p><div class="flex gap-2 mt-1">${status}<span class="text-xs text-slate-400">PIN: ${emp.pin}</span></div></div><button onclick="window.openEmployeeModal('${child.key}')" class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg">Подробно</button></div>`; if (emp.isOnline) { onlineCount++; onlineList.innerHTML += `<div class="bg-white border rounded-xl p-3 flex gap-3"><div class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center">${emp.name[0].toUpperCase()}</div><div><p class="text-sm font-semibold">${emp.name}</p><p class="text-xs text-emerald-600">На кассе</p></div></div>`; } }); document.getElementById('online-count').innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 ${onlineCount>0?'animate-pulse':''}"></span> ${onlineCount} онлайн`; } });
+        window.openEmployeeModal = (id) => { currentEditEmployeeId = id; const emp = employeesData[id]; document.getElementById('edit-emp-name').value = emp.name; document.getElementById('edit-emp-pin').value = emp.pin; const link = `${window.location.origin}${window.location.pathname.replace('admin.html', '')}cashier.html?auth=${id}`; document.getElementById('cabinet-link').value = link; const qrContainer = document.getElementById('qrcode-container'); qrContainer.innerHTML = ''; new QRCode(qrContainer, { text: link, width: 128, height: 128, colorDark: "#312e81", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L }); openModal('employee-modal', 'emp-modal-content'); };
+        document.getElementById('edit-employee-form').addEventListener('submit', (e) => { e.preventDefault(); update(ref(db, `employees/${currentEditEmployeeId}`), { name: document.getElementById('edit-emp-name').value, pin: document.getElementById('edit-emp-pin').value }).then(() => closeModal('employee-modal', 'emp-modal-content')); });
+        document.getElementById('delete-emp-btn').addEventListener('click', () => { if (confirm('Удалить?')) remove(ref(db, `employees/${currentEditEmployeeId}`)).then(() => closeModal('employee-modal', 'emp-modal-content')); });
         document.getElementById('copy-link-btn').addEventListener('click', () => { document.getElementById('cabinet-link').select(); document.execCommand('copy'); alert('Скопировано!'); });
-
-        // ==========================================
-        // БЛОК АНАЛИТИКИ
-        // ==========================================
-        onValue(ref(db, 'sales'), (snapshot) => {
-            let tRev = 0, tRec = 0, todayRev = 0, todayRec = 0;
-            const today = new Date().toDateString();
-            const list = document.getElementById('analytics-sales-list');
-            list.innerHTML = '';
-            
-            if (snapshot.exists()) {
-                const sales = [];
-                snapshot.forEach(child => {
-                    const s = child.val();
-                    if(new Date(s.timestamp).toDateString() === today) { todayRev += s.amount; todayRec++; }
-                    tRev += s.amount||0; tRec++;
-                    sales.push(s);
-                });
-                
-                document.getElementById('dash-today-revenue').innerText = `${todayRev.toLocaleString('ru')} ₽`;
-                document.getElementById('dash-today-receipts').innerText = todayRec;
-                document.getElementById('analytics-total-revenue').innerText = `${tRev.toLocaleString('ru')} ₽`;
-                document.getElementById('analytics-avg-check').innerText = `${Math.round(tRev/tRec).toLocaleString('ru')} ₽`;
-                    
-                sales.slice(-5).reverse().forEach(s => {
-                    const t = new Date(s.timestamp).toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'});
-                    list.innerHTML += `<div class="p-3 flex justify-between"><div class="flex gap-3"><div class="w-8 h-8 bg-slate-50 flex items-center justify-center rounded-lg">🛒</div><div><p class="text-sm font-semibold">Продажа • ${t}</p><p class="text-xs text-slate-400">${s.cashierName||'Система'}</p></div></div><span class="text-sm font-bold">+${s.amount} ₽</span></div>`;
-                });
-            }
-        });
+        onValue(ref(db, 'sales'), (snapshot) => { let tRev = 0, tRec = 0, todayRev = 0, todayRec = 0; const today = new Date().toDateString(); const list = document.getElementById('analytics-sales-list'); list.innerHTML = ''; if (snapshot.exists()) { const sales = []; snapshot.forEach(child => { const s = child.val(); if(new Date(s.timestamp).toDateString() === today) { todayRev += s.amount; todayRec++; } tRev += s.amount||0; tRec++; sales.push(s); }); document.getElementById('dash-today-revenue').innerText = `${todayRev.toLocaleString('ru')} ₽`; document.getElementById('dash-today-receipts').innerText = todayRec; document.getElementById('analytics-total-revenue').innerText = `${tRev.toLocaleString('ru')} ₽`; document.getElementById('analytics-avg-check').innerText = `${Math.round(tRev/tRec).toLocaleString('ru')} ₽`; sales.slice(-5).reverse().forEach(s => { const t = new Date(s.timestamp).toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'}); list.innerHTML += `<div class="p-3 flex justify-between"><div class="flex gap-3"><div class="w-8 h-8 bg-slate-50 flex items-center justify-center rounded-lg">🛒</div><div><p class="text-sm font-semibold">Продажа • ${t}</p><p class="text-xs text-slate-400">${s.cashierName||'Система'}</p></div></div><span class="text-sm font-bold">+${s.amount} ₽</span></div>`; }); } });
     </script>
 </body>
 </html>
