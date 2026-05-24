@@ -10,26 +10,43 @@
     <style>
         body { font-family: 'Inter', sans-serif; overflow: hidden; background-color: #f8fafc; }
         
-        /* Плавное затухание для карусели картинок */
+        /* Карусель: плавная смена картинок */
         .carousel-bg { 
             background-size: cover; 
             background-repeat: no-repeat;
-            transition: background-image 0.8s ease-in-out, background-position 0.1s ease-out; 
+            transition: background-image 0.8s ease-in-out; 
         }
         
-        /* Кастомный скроллбар для чека */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
-        /* Стили для режима калибровки (чтобы палец не скроллил страницу) */
-        #calibration-overlay { touch-action: none; cursor: grab; }
-        #calibration-overlay:active { cursor: grabbing; }
+        /* Отключение выделения для джойстика */
+        .no-select { user-select: none; -webkit-user-select: none; touch-action: none; }
+        
+        /* Кнопки джойстика */
+        .joy-btn {
+            width: 64px; height: 64px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: #334155;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.1s, transform 0.1s;
+            cursor: pointer;
+        }
+        .joy-btn:active {
+            transform: scale(0.95);
+        }
+        .joy-btn.active {
+            background-color: #4f46e5; /* indigo-600 */
+            color: white;
+        }
     </style>
 </head>
-<body class="h-screen w-full flex flex-col relative text-slate-900">
+<body class="h-screen w-full flex flex-col relative text-slate-900 no-select">
 
-    <!-- 1. СОСТОЯНИЕ: ОЖИДАНИЕ (РЕКЛАМА НА ВЕСЬ ЭКРАН) -->
+    <!-- 1. СОСТОЯНИЕ: ОЖИДАНИЕ (РЕКЛАМА) -->
     <div id="screen-idle" class="absolute inset-0 z-40 carousel-bg flex flex-col justify-end p-12 transition-opacity duration-700">
         <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/20 to-transparent"></div>
         <div class="relative z-10 text-white">
@@ -40,15 +57,12 @@
 
     <!-- 2. СОСТОЯНИЕ: АКТИВНЫЙ ЧЕК -->
     <div id="screen-active" class="absolute inset-0 z-30 flex bg-slate-50 opacity-0 pointer-events-none transition-opacity duration-500">
-        <!-- Левая часть: ЧЕК -->
         <div class="w-1/3 bg-white shadow-2xl flex flex-col z-20">
             <div class="p-6 border-b border-slate-100 bg-slate-50">
                 <h2 class="text-2xl font-bold text-slate-800">Ваш заказ</h2>
             </div>
             
-            <div class="flex-1 overflow-y-auto p-6 space-y-4" id="client-receipt">
-                <!-- Товары -->
-            </div>
+            <div class="flex-1 overflow-y-auto p-6 space-y-4" id="client-receipt"></div>
 
             <div class="p-6 bg-white border-t border-slate-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)]">
                 <div id="client-discount-block" class="flex justify-between items-center mb-2 hidden">
@@ -62,7 +76,6 @@
             </div>
         </div>
         
-        <!-- Правая часть: УМЕНЬШЕННАЯ РЕКЛАМА -->
         <div class="w-2/3 carousel-bg relative">
             <div class="absolute inset-0 bg-slate-900/10"></div>
         </div>
@@ -77,7 +90,7 @@
             
             <div class="text-7xl font-black text-indigo-600 mb-10" id="payment-total">0 ₽</div>
 
-            <!-- Блок Наличных денег -->
+            <!-- Блок Наличных -->
             <div id="client-cash-block" class="hidden space-y-4">
                 <div class="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex justify-between items-center text-xl">
                     <span class="font-semibold text-slate-500">Получено кассиром:</span>
@@ -89,7 +102,7 @@
                 </div>
             </div>
 
-            <!-- Блок Перевода по QR / СБП -->
+            <!-- Блок СБП -->
             <div id="client-card-block" class="hidden flex-col items-center">
                 <div class="p-4 bg-white rounded-2xl border-4 border-indigo-100 shadow-sm inline-block mb-6">
                     <div id="client-qrcode"></div>
@@ -101,7 +114,6 @@
                     <span class="text-xl font-bold">Ожидаем подтверждения платежа...</span>
                 </div>
             </div>
-
         </div>
     </div>
 
@@ -114,17 +126,44 @@
         <p class="text-2xl font-medium text-emerald-100 text-center px-4">Приходите ещё, будем рады вас видеть!</p>
     </div>
 
-    <!-- 5. РЕЖИМ КАЛИБРОВКИ РЕКЛАМЫ (С ПАЛЬЦЕМ) -->
+    <!-- 5. РЕЖИМ КАЛИБРОВКИ С ДЖОЙСТИКОМ -->
     <div id="calibration-overlay" class="absolute inset-0 z-[60] bg-black hidden flex flex-col items-center justify-center">
+        <!-- Само настраиваемое изображение -->
         <div id="calib-img" class="absolute inset-0 bg-cover bg-no-repeat" style="transition: none;"></div>
-        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-10 pb-16 text-white text-center pointer-events-none">
-            <h2 class="text-3xl font-bold mb-2">Настройка баннера</h2>
-            <p class="text-xl opacity-90">Тяните картинку пальцем вверх или вниз, чтобы отцентровать её.<br>Изменения сохраняются автоматически.</p>
+        
+        <!-- Заголовок -->
+        <div class="absolute top-10 bg-black/70 p-6 rounded-3xl text-white text-center backdrop-blur-md shadow-2xl border border-white/10">
+            <div class="flex items-center justify-center gap-3 mb-2">
+                <span class="relative flex h-4 w-4">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+                </span>
+                <h2 class="text-2xl font-bold">Настройка баннера</h2>
+            </div>
+            <p class="text-slate-300">Используйте джойстик, чтобы отцентровать картинку.<br>Изменения сохраняются автоматически.</p>
         </div>
-        <div class="absolute top-8 right-8 pointer-events-none">
-            <div class="bg-emerald-500 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg">
-                <span class="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-emerald-300 opacity-75"></span>
-                Режим настройки активен
+
+        <!-- Виртуальный Джойстик (D-Pad) -->
+        <div class="absolute bottom-16 right-16 bg-slate-900/60 p-4 rounded-[2.5rem] backdrop-blur-xl border border-white/10 shadow-2xl flex flex-col items-center gap-2">
+            <!-- Вверх -->
+            <div id="joy-up" class="joy-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7" /></svg>
+            </div>
+            <!-- Влево и Вправо -->
+            <div class="flex gap-2">
+                <div id="joy-left" class="joy-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7" /></svg>
+                </div>
+                <div class="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center pointer-events-none">
+                    <div class="w-4 h-4 rounded-full bg-white/20"></div>
+                </div>
+                <div id="joy-right" class="joy-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" /></svg>
+                </div>
+            </div>
+            <!-- Вниз -->
+            <div id="joy-down" class="joy-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
             </div>
         </div>
     </div>
@@ -150,7 +189,6 @@
         const DEFAULT_AD_URL = "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?q=80&w=2000&auto=format&fit=crop";
 
         function updateCarouselDisplay() {
-            // Если включен режим калибровки, карусель ставится на паузу
             if (calibrationMode.active) return;
 
             const bgElements = document.querySelectorAll('.carousel-bg');
@@ -158,23 +196,23 @@
             if (adObjects.length === 0) {
                 bgElements.forEach(el => {
                     el.style.backgroundImage = `url('${DEFAULT_AD_URL}')`;
-                    el.style.backgroundPosition = `center 50%`;
+                    el.style.backgroundPosition = `50% 50%`;
                 });
                 return;
             }
             
             const currentAd = adObjects[currentAdIndex];
+            const currentX = currentAd.posX !== undefined ? currentAd.posX : 50;
             const currentY = currentAd.posY !== undefined ? currentAd.posY : 50;
 
             bgElements.forEach(el => {
                 el.style.backgroundImage = `url('${currentAd.url}')`;
-                el.style.backgroundPosition = `center ${currentY}%`;
+                el.style.backgroundPosition = `${currentX}% ${currentY}%`;
             });
             
             currentAdIndex = (currentAdIndex + 1) % adObjects.length;
         }
 
-        // Загрузка ссылок на рекламу из БД
         onValue(ref(db, 'ads'), (snapshot) => {
             adObjects = [];
             if (snapshot.exists()) {
@@ -189,82 +227,97 @@
             updateCarouselDisplay();
         });
 
-        // Смена баннера каждые 7 секунд
         setInterval(updateCarouselDisplay, 7000);
 
-        // --- ЛОГИКА КАЛИБРОВКИ С ПЛАНШЕТА (ТАСКАТЬ ПАЛЬЦЕМ) ---
+        // --- ЛОГИКА КАЛИБРОВКИ С ДЖОЙСТИКОМ ---
         let calibrationMode = { active: false, adId: null };
         const calibOverlay = document.getElementById('calibration-overlay');
         const calibImg = document.getElementById('calib-img');
+        
+        let currentPosX = 50;
         let currentPosY = 50;
+        let moveInterval = null;
 
-        // Слушаем команды из админки
+        // Прием сигнала из админки
         onValue(ref(db, 'settings/calibrationMode'), (snapshot) => {
             calibrationMode = snapshot.val() || { active: false, adId: null };
             
             if (calibrationMode.active && calibrationMode.adId) {
-                // Ищем картинку, которую нужно настроить
                 const ad = adObjects.find(a => a.id === calibrationMode.adId);
                 if (ad) {
                     calibOverlay.classList.remove('hidden');
                     calibImg.style.backgroundImage = `url('${ad.url}')`;
+                    currentPosX = ad.posX !== undefined ? ad.posX : 50;
                     currentPosY = ad.posY !== undefined ? ad.posY : 50;
-                    calibImg.style.backgroundPosition = `center ${currentPosY}%`;
+                    calibImg.style.backgroundPosition = `${currentPosX}% ${currentPosY}%`;
                 }
             } else {
                 calibOverlay.classList.add('hidden');
-                // При выходе из калибровки сразу обновляем фон чека/экрана ожидания
                 updateCarouselDisplay();
             }
         });
 
-        // Сенсорное управление перетаскиванием (drag to crop)
-        let isDraggingCrop = false;
-        let startY = 0;
-
-        const startDragCrop = (e) => {
-            isDraggingCrop = true;
-            startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-        };
-
-        const doDragCrop = (e) => {
-            if (!isDraggingCrop) return;
-            e.preventDefault(); // Предотвращаем скролл страницы на iPad
+        // Функция перемещения
+        function moveImage(dx, dy) {
+            currentPosX += dx;
+            currentPosY += dy;
             
-            const y = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-            const deltaY = y - startY;
-            
-            const height = window.innerHeight;
-            // Рассчитываем смещение в процентах
-            const deltaPercent = (deltaY / height) * 100;
-            
-            currentPosY -= deltaPercent;
-            
+            if (currentPosX < 0) currentPosX = 0;
+            if (currentPosX > 100) currentPosX = 100;
             if (currentPosY < 0) currentPosY = 0;
             if (currentPosY > 100) currentPosY = 100;
-            
-            calibImg.style.backgroundPosition = `center ${currentPosY}%`;
-            startY = y;
-        };
 
-        const endDragCrop = () => {
-            if (!isDraggingCrop) return;
-            isDraggingCrop = false;
-            // При отпускании пальца отправляем новую координату Y в базу данных
+            calibImg.style.backgroundPosition = `${currentPosX}% ${currentPosY}%`;
+        }
+
+        // Сохранение в базу
+        function savePositionToDB() {
             if (calibrationMode.adId) {
                 update(ref(db, `ads/${calibrationMode.adId}`), {
+                    posX: Math.round(currentPosX),
                     posY: Math.round(currentPosY)
                 });
             }
-        };
+        }
 
-        calibOverlay.addEventListener('mousedown', startDragCrop);
-        document.addEventListener('mousemove', doDragCrop, { passive: false });
-        document.addEventListener('mouseup', endDragCrop);
+        // Навешивание логики джойстика
+        function setupJoystickBtn(btnId, dx, dy) {
+            const btn = document.getElementById(btnId);
+            
+            // Pointer events отлично работают и с мышкой, и с тачем (пальцами) на iPad
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault(); 
+                btn.classList.add('active');
+                
+                // Единичное смещение при клике
+                moveImage(dx, dy);
 
-        calibOverlay.addEventListener('touchstart', startDragCrop, { passive: false });
-        calibOverlay.addEventListener('touchmove', doDragCrop, { passive: false });
-        calibOverlay.addEventListener('touchend', endDragCrop);
+                // Если удерживают — двигаем плавно
+                if (moveInterval) clearInterval(moveInterval);
+                moveInterval = setInterval(() => {
+                    moveImage(dx, dy);
+                }, 40); // Скорость движения (чем меньше цифра, тем быстрее)
+            });
+
+            const stopAction = (e) => {
+                e.preventDefault();
+                btn.classList.remove('active');
+                if (moveInterval) {
+                    clearInterval(moveInterval);
+                    moveInterval = null;
+                    savePositionToDB(); // Сохраняем после того как палец отпустили
+                }
+            };
+
+            btn.addEventListener('pointerup', stopAction);
+            btn.addEventListener('pointerleave', stopAction);
+            btn.addEventListener('pointercancel', stopAction);
+        }
+
+        setupJoystickBtn('joy-up', 0, -1);
+        setupJoystickBtn('joy-down', 0, 1);
+        setupJoystickBtn('joy-left', -1, 0);
+        setupJoystickBtn('joy-right', 1, 0);
 
 
         // --- ДАННЫЕ ОПЛАТЫ И QR-КОД ---
@@ -304,15 +357,13 @@
         }
 
         onValue(ref(db, 'live_display'), (snapshot) => {
-            // Если включен режим настройки рекламы, блокируем вывод чеков
-            if (calibrationMode.active) return;
+            if (calibrationMode.active) return; // Блокируем вывод чеков, если идет настройка
 
             const data = snapshot.val(); 
             if (!data) { switchScreen('idle'); return; }
             if (data.status === 'success') { switchScreen('success'); return; }
             if (!data.cart || data.cart.length === 0) { switchScreen('idle'); return; }
 
-            // Отрисовка корзины
             const receiptEl = document.getElementById('client-receipt'); 
             receiptEl.innerHTML = '';
             
@@ -334,7 +385,6 @@
 
             document.getElementById('client-total').innerText = `${data.total} ₽`;
             
-            // Глобальная скидка
             if (data.globalDiscount > 0) { 
                 document.getElementById('client-discount-block').classList.remove('hidden'); 
                 document.getElementById('client-discount-val').innerText = `${data.globalDiscount}%`; 
@@ -342,7 +392,6 @@
                 document.getElementById('client-discount-block').classList.add('hidden'); 
             }
 
-            // Статусы оплаты
             if (data.status === 'payment') {
                 document.getElementById('payment-total').innerText = `${data.total} ₽`;
                 
