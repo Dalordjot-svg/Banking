@@ -10,17 +10,21 @@
     <style>
         body { font-family: 'Inter', sans-serif; overflow: hidden; background-color: #f8fafc; }
         
-        /* Плавное затухание для карусели картинок под iPad Air 4 */
+        /* Плавное затухание для карусели картинок */
         .carousel-bg { 
             background-size: cover; 
-            background-position: center; 
             background-repeat: no-repeat;
-            transition: background-image 0.8s ease-in-out; 
+            transition: background-image 0.8s ease-in-out, background-position 0.1s ease-out; 
         }
         
+        /* Кастомный скроллбар для чека */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        /* Стили для режима калибровки (чтобы палец не скроллил страницу) */
+        #calibration-overlay { touch-action: none; cursor: grab; }
+        #calibration-overlay:active { cursor: grabbing; }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col relative text-slate-900">
@@ -58,7 +62,7 @@
             </div>
         </div>
         
-        <!-- Правая часть: РЕКЛАМА -->
+        <!-- Правая часть: УМЕНЬШЕННАЯ РЕКЛАМА -->
         <div class="w-2/3 carousel-bg relative">
             <div class="absolute inset-0 bg-slate-900/10"></div>
         </div>
@@ -85,7 +89,7 @@
                 </div>
             </div>
 
-            <!-- Блок Перевода по QR / СБП (Данные обновлены из image_2.png) -->
+            <!-- Блок Перевода по QR / СБП -->
             <div id="client-card-block" class="hidden flex-col items-center">
                 <div class="p-4 bg-white rounded-2xl border-4 border-indigo-100 shadow-sm inline-block mb-6">
                     <div id="client-qrcode"></div>
@@ -110,10 +114,26 @@
         <p class="text-2xl font-medium text-emerald-100 text-center px-4">Приходите ещё, будем рады вас видеть!</p>
     </div>
 
+    <!-- 5. РЕЖИМ КАЛИБРОВКИ РЕКЛАМЫ (С ПАЛЬЦЕМ) -->
+    <div id="calibration-overlay" class="absolute inset-0 z-[60] bg-black hidden flex flex-col items-center justify-center">
+        <div id="calib-img" class="absolute inset-0 bg-cover bg-no-repeat" style="transition: none;"></div>
+        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-10 pb-16 text-white text-center pointer-events-none">
+            <h2 class="text-3xl font-bold mb-2">Настройка баннера</h2>
+            <p class="text-xl opacity-90">Тяните картинку пальцем вверх или вниз, чтобы отцентровать её.<br>Изменения сохраняются автоматически.</p>
+        </div>
+        <div class="absolute top-8 right-8 pointer-events-none">
+            <div class="bg-emerald-500 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg">
+                <span class="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-emerald-300 opacity-75"></span>
+                Режим настройки активен
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+        // КОНФИГ FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyDqQQlsIdHgizrPfZC2If9uHegyiiCqfSc",
             authDomain: "bd2026-b52de.firebaseapp.com",
@@ -124,162 +144,233 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // --- ДИНАМИЧЕСКАЯ КАРУСЕЛЬ РЕКЛАМЫ ИЗ FIREBASE ---
-        let adImages = [];
+        // --- ЛОГИКА КАРУСЕЛИ РЕКЛАМЫ ---
+        let adObjects = []; 
         let currentAdIndex = 0;
-        
         const DEFAULT_AD_URL = "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?q=80&w=2000&auto=format&fit=crop";
 
         function updateCarouselDisplay() {
-            if (adImages.length === 0) {
-                document.querySelectorAll('.carousel-bg').forEach(el => {
+            // Если включен режим калибровки, карусель ставится на паузу
+            if (calibrationMode.active) return;
+
+            const bgElements = document.querySelectorAll('.carousel-bg');
+            
+            if (adObjects.length === 0) {
+                bgElements.forEach(el => {
                     el.style.backgroundImage = `url('${DEFAULT_AD_URL}')`;
+                    el.style.backgroundPosition = `center 50%`;
                 });
                 return;
             }
             
-            const currentImgUrl = adImages[currentAdIndex];
-            document.querySelectorAll('.carousel-bg').forEach(el => {
-                el.style.backgroundImage = `url('${currentImgUrl}')`;
+            const currentAd = adObjects[currentAdIndex];
+            const currentY = currentAd.posY !== undefined ? currentAd.posY : 50;
+
+            bgElements.forEach(el => {
+                el.style.backgroundImage = `url('${currentAd.url}')`;
+                el.style.backgroundPosition = `center ${currentY}%`;
             });
             
-            currentAdIndex = (currentAdIndex + 1) % adImages.length;
+            currentAdIndex = (currentAdIndex + 1) % adObjects.length;
         }
 
+        // Загрузка ссылок на рекламу из БД
         onValue(ref(db, 'ads'), (snapshot) => {
-            adImages = [];
+            adObjects = [];
             if (snapshot.exists()) {
                 snapshot.forEach(child => {
                     const adData = child.val();
-                    if (adData && adData.url) adImages.push(adData.url);
+                    if (adData && adData.url) {
+                        adObjects.push({ id: child.key, ...adData });
+                    }
                 });
             }
             currentAdIndex = 0; 
             updateCarouselDisplay();
         });
 
+        // Смена баннера каждые 7 секунд
         setInterval(updateCarouselDisplay, 7000);
 
-        // ДАННЫЕ ОПЛАТЫ ИЗ СКРИНШОТА image_2.png
-        const PAYMENT_LINK = "https://qr.nspk.ru/AS10003P5K6L0K00CP891NQC49A70M9F?type=01&bank=100000000111&crc=C6C6";
-        const PAYMENT_PHONE = "+7 (958) 516-16-79";
-        document.getElementById('client-phone').innerText = PAYMENT_PHONE;
-        new QRCode(document.getElementById('client-qrcode'), {
-            text: PAYMENT_LINK, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+        // --- ЛОГИКА КАЛИБРОВКИ С ПЛАНШЕТА (ТАСКАТЬ ПАЛЬЦЕМ) ---
+        let calibrationMode = { active: false, adId: null };
+        const calibOverlay = document.getElementById('calibration-overlay');
+        const calibImg = document.getElementById('calib-img');
+        let currentPosY = 50;
+
+        // Слушаем команды из админки
+        onValue(ref(db, 'settings/calibrationMode'), (snapshot) => {
+            calibrationMode = snapshot.val() || { active: false, adId: null };
+            
+            if (calibrationMode.active && calibrationMode.adId) {
+                // Ищем картинку, которую нужно настроить
+                const ad = adObjects.find(a => a.id === calibrationMode.adId);
+                if (ad) {
+                    calibOverlay.classList.remove('hidden');
+                    calibImg.style.backgroundImage = `url('${ad.url}')`;
+                    currentPosY = ad.posY !== undefined ? ad.posY : 50;
+                    calibImg.style.backgroundPosition = `center ${currentPosY}%`;
+                }
+            } else {
+                calibOverlay.classList.add('hidden');
+                // При выходе из калибровки сразу обновляем фон чека/экрана ожидания
+                updateCarouselDisplay();
+            }
         });
 
-        // --- УПРАВЛЕНИЕ ЭКРАНАМИ И СОСТОЯНИЯМИ ---
-        const scrIdle = document.getElementById('screen-idle');
-        const scrActive = document.getElementById('screen-active');
-        const scrPayment = document.getElementById('screen-payment');
-        const scrSuccess = document.getElementById('screen-success');
+        // Сенсорное управление перетаскиванием (drag to crop)
+        let isDraggingCrop = false;
+        let startY = 0;
 
-        function switchScreen(state) {
-            [scrIdle, scrActive, scrPayment, scrSuccess].forEach(el => {
-                el.classList.add('opacity-0', 'pointer-events-none');
-                el.classList.remove('z-50');
-            });
+        const startDragCrop = (e) => {
+            isDraggingCrop = true;
+            startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+        };
 
-            let target;
-            if (state === 'idle') target = scrIdle;
-            if (state === 'active') target = scrActive;
-            if (state === 'payment') target = scrPayment;
-            if (state === 'success') {
-                target = scrSuccess;
-                document.getElementById('success-icon').classList.remove('scale-50');
-                document.getElementById('success-icon').classList.add('scale-100');
-            } else {
-                document.getElementById('success-icon').classList.add('scale-50');
-                document.getElementById('success-icon').classList.remove('scale-100');
+        const doDragCrop = (e) => {
+            if (!isDraggingCrop) return;
+            e.preventDefault(); // Предотвращаем скролл страницы на iPad
+            
+            const y = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            const deltaY = y - startY;
+            
+            const height = window.innerHeight;
+            // Рассчитываем смещение в процентах
+            const deltaPercent = (deltaY / height) * 100;
+            
+            currentPosY -= deltaPercent;
+            
+            if (currentPosY < 0) currentPosY = 0;
+            if (currentPosY > 100) currentPosY = 100;
+            
+            calibImg.style.backgroundPosition = `center ${currentPosY}%`;
+            startY = y;
+        };
+
+        const endDragCrop = () => {
+            if (!isDraggingCrop) return;
+            isDraggingCrop = false;
+            // При отпускании пальца отправляем новую координату Y в базу данных
+            if (calibrationMode.adId) {
+                update(ref(db, `ads/${calibrationMode.adId}`), {
+                    posY: Math.round(currentPosY)
+                });
             }
+        };
 
-            if (target) {
-                target.classList.remove('opacity-0', 'pointer-events-none');
-                target.classList.add('z-50');
+        calibOverlay.addEventListener('mousedown', startDragCrop);
+        document.addEventListener('mousemove', doDragCrop, { passive: false });
+        document.addEventListener('mouseup', endDragCrop);
+
+        calibOverlay.addEventListener('touchstart', startDragCrop, { passive: false });
+        calibOverlay.addEventListener('touchmove', doDragCrop, { passive: false });
+        calibOverlay.addEventListener('touchend', endDragCrop);
+
+
+        // --- ДАННЫЕ ОПЛАТЫ И QR-КОД ---
+        const PAYMENT_LINK = "https://qr.nspk.ru/AS10003P5K6L0K00CP891NQC49A70M9F?type=01&bank=100000000111&crc=C6C6";
+        document.getElementById('client-phone').innerText = "+7 (958) 516-16-79";
+        new QRCode(document.getElementById('client-qrcode'), { text: PAYMENT_LINK, width: 200, height: 200, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
+
+
+        // --- УПРАВЛЕНИЕ ЭКРАНАМИ (СИНХРОНИЗАЦИЯ С КАССОЙ) ---
+        const scrIdle = document.getElementById('screen-idle'); 
+        const scrActive = document.getElementById('screen-active'); 
+        const scrPayment = document.getElementById('screen-payment'); 
+        const scrSuccess = document.getElementById('screen-success');
+        
+        function switchScreen(state) {
+            [scrIdle, scrActive, scrPayment, scrSuccess].forEach(el => { 
+                el.classList.add('opacity-0', 'pointer-events-none'); 
+                el.classList.remove('z-50'); 
+            });
+            
+            let target;
+            if (state === 'idle') target = scrIdle; 
+            if (state === 'active') target = scrActive; 
+            if (state === 'payment') target = scrPayment;
+            
+            if (state === 'success') { 
+                target = scrSuccess; 
+                document.getElementById('success-icon').classList.replace('scale-50', 'scale-100'); 
+            } else { 
+                document.getElementById('success-icon').classList.replace('scale-100', 'scale-50'); 
+            }
+            
+            if (target) { 
+                target.classList.remove('opacity-0', 'pointer-events-none'); 
+                target.classList.add('z-50'); 
             }
         }
 
-        // СИНХРОНИЗАЦИЯ С КАССОЙ
         onValue(ref(db, 'live_display'), (snapshot) => {
-            const data = snapshot.val();
+            // Если включен режим настройки рекламы, блокируем вывод чеков
+            if (calibrationMode.active) return;
+
+            const data = snapshot.val(); 
             if (!data) { switchScreen('idle'); return; }
+            if (data.status === 'success') { switchScreen('success'); return; }
+            if (!data.cart || data.cart.length === 0) { switchScreen('idle'); return; }
 
-            if (data.status === 'success') {
-                switchScreen('success');
-                return;
-            }
-
-            if (!data.cart || data.cart.length === 0) {
-                switchScreen('idle');
-                return;
-            }
-
-            const receiptEl = document.getElementById('client-receipt');
+            // Отрисовка корзины
+            const receiptEl = document.getElementById('client-receipt'); 
             receiptEl.innerHTML = '';
             
             data.cart.forEach(item => {
                 let priceHtml = `<p class="text-lg text-slate-500 font-bold">${item.price} ₽</p>`;
                 if (item.isCustomPrice || item.itemDiscount > 0) {
                     let badge = item.isCustomPrice ? 'Своя цена' : `Скидка ${item.itemDiscount}%`;
-                    priceHtml = `
-                        <p class="text-lg font-bold text-rose-500">
-                            <span class="line-through text-slate-300 font-normal mr-2 text-sm">${item.originalPrice}</span>
-                            ${item.price} ₽ 
-                            <span class="bg-rose-100 text-rose-600 text-[10px] uppercase px-2 py-1 rounded ml-2">${badge}</span>
-                        </p>`;
+                    priceHtml = `<p class="text-lg font-bold text-rose-500"><span class="line-through text-slate-300 font-normal mr-2 text-sm">${item.originalPrice}</span>${item.price} ₽ <span class="bg-rose-100 text-rose-600 text-[10px] uppercase px-2 py-1 rounded ml-2">${badge}</span></p>`;
                 }
-
                 receiptEl.innerHTML += `
                     <div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                         <div class="flex-1">
                             <p class="text-xl font-bold text-slate-800">${item.name}</p>
                             ${priceHtml}
                         </div>
-                        <div class="text-2xl font-black text-slate-800 bg-slate-50 w-12 h-12 flex items-center justify-center rounded-xl">
-                            ${item.qty}
-                        </div>
-                    </div>
-                `;
+                        <div class="text-2xl font-black text-slate-800 bg-slate-50 w-12 h-12 flex items-center justify-center rounded-xl">${item.qty}</div>
+                    </div>`;
             });
 
             document.getElementById('client-total').innerText = `${data.total} ₽`;
             
-            if (data.globalDiscount > 0) {
-                document.getElementById('client-discount-block').classList.remove('hidden');
-                document.getElementById('client-discount-val').innerText = `${data.globalDiscount}%`;
-            } else {
-                document.getElementById('client-discount-block').classList.add('hidden');
+            // Глобальная скидка
+            if (data.globalDiscount > 0) { 
+                document.getElementById('client-discount-block').classList.remove('hidden'); 
+                document.getElementById('client-discount-val').innerText = `${data.globalDiscount}%`; 
+            } else { 
+                document.getElementById('client-discount-block').classList.add('hidden'); 
             }
 
+            // Статусы оплаты
             if (data.status === 'payment') {
                 document.getElementById('payment-total').innerText = `${data.total} ₽`;
                 
                 if (data.paymentMethod === 'cash') {
-                    document.getElementById('payment-subtitle').innerText = "Оплата наличными";
-                    document.getElementById('client-cash-block').classList.remove('hidden');
+                    document.getElementById('payment-subtitle').innerText = "Оплата наличными"; 
+                    document.getElementById('client-cash-block').classList.remove('hidden'); 
                     document.getElementById('client-card-block').classList.add('hidden');
+                    document.getElementById('client-received').innerText = `${data.cashReceived} ₽`; 
                     
-                    document.getElementById('client-received').innerText = `${data.cashReceived} ₽`;
                     const change = data.cashReceived - data.total;
-                    
-                    if (change >= 0 && data.cashReceived > 0) {
-                        document.getElementById('client-change-wrapper').classList.remove('opacity-50');
-                        document.getElementById('client-change').innerText = `${change} ₽`;
-                    } else {
-                        document.getElementById('client-change-wrapper').classList.add('opacity-50');
-                        document.getElementById('client-change').innerText = `Ожидание...`;
+                    if (change >= 0 && data.cashReceived > 0) { 
+                        document.getElementById('client-change-wrapper').classList.remove('opacity-50'); 
+                        document.getElementById('client-change').innerText = `${change} ₽`; 
+                    } else { 
+                        document.getElementById('client-change-wrapper').classList.add('opacity-50'); 
+                        document.getElementById('client-change').innerText = `Ожидание...`; 
                     }
                 } else {
-                    document.getElementById('payment-subtitle').innerText = "Оплата переводом / QR";
-                    document.getElementById('client-cash-block').classList.add('hidden');
-                    document.getElementById('client-card-block').classList.remove('hidden');
+                    document.getElementById('payment-subtitle').innerText = "Оплата переводом / QR"; 
+                    document.getElementById('client-cash-block').classList.add('hidden'); 
+                    document.getElementById('client-card-block').classList.remove('hidden'); 
                     document.getElementById('client-card-block').classList.add('flex');
                 }
                 
-                switchScreen('payment');
+                switchScreen('payment'); 
                 setTimeout(() => document.getElementById('payment-card').classList.remove('scale-95'), 10);
             } else {
-                document.getElementById('payment-card').classList.add('scale-95');
+                document.getElementById('payment-card').classList.add('scale-95'); 
                 switchScreen('active');
             }
         });
